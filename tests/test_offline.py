@@ -6,7 +6,7 @@ import zipfile
 
 from jury.brief import load_challenges, weighted_score
 from jury.citations import locate, verify_brief
-from jury.repo import REDACTED, pack_zip
+from jury.repo import DATA_FILE_KEEP_LINES, REDACTED, pack_zip
 
 APP = '''from fastapi import FastAPI
 app = FastAPI()
@@ -68,7 +68,7 @@ def test_notebook_outputs_dropped_and_data_truncated():
     nb = pack.file("train.ipynb")
     assert "boto3.client" in nb.text and "AAAA" not in nb.text
     csv = pack.file("data/labels.csv")
-    assert csv.lines <= 61 and "first 60 of 500 lines" in csv.note
+    assert csv.lines <= DATA_FILE_KEEP_LINES + 1 and f"first {DATA_FILE_KEEP_LINES} of 500 lines" in csv.note
 
 
 def test_secrets_redacted_and_recorded():
@@ -100,12 +100,12 @@ def test_verify_brief_and_weighted_score():
         "claims": [{"claim": "Real-time detection with watsonx", "status": "contradicted",
                     "evidence": [{"file": "api/app.py", "quote": 'return {"corrosion": "severe", "confidence": 0.97}'},
                                  {"file": "api/app.py", "quote": "watsonx.predict(img)"}]}],
-        "criteria": [{"name": c.name, "score": s} for c, s in zip(ch.criteria, [8, 2, 3, 5])],
+        "criteria": [{"name": c.name, "score": s} for c, s in zip(ch.criteria, [8, 2, 4, 5, 6], strict=True)],
     }
     totals = verify_brief(pack, brief)
     assert totals["total"] == 2 and totals["verified"] == 1
-    # weights 30/30/20/20 -> (240 + 60 + 60 + 100) / 100
-    assert weighted_score(brief, ch) == 4.6
+    # weights 25/20/25/10/20 -> (200 + 40 + 100 + 50 + 120) / 100
+    assert weighted_score(brief, ch) == 5.1
 
 
 def test_challenges_load():

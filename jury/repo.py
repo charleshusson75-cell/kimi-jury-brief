@@ -19,7 +19,7 @@ import httpx
 
 MAX_DOWNLOAD_BYTES = 150 * 1024 * 1024  # stop downloading past 150 MB
 MAX_FILE_BYTES = 300_000  # skip single source files larger than this
-DATA_FILE_KEEP_LINES = 60  # keep only the head of CSV/JSONL/... data files
+DATA_FILE_KEEP_LINES = 20  # keep the header + a few rows of CSV/JSONL/... data files
 MAX_TOTAL_CHARS = 3_400_000  # ~1M tokens of code; hard stop before packing more
 
 GITHUB_RE = re.compile(
@@ -148,18 +148,18 @@ def download_github_zip(url: str) -> tuple[bytes, str, str]:
     owner, repo, ref = parse_github_url(url)
     archive = f"https://github.com/{owner}/{repo}/archive/{ref or 'HEAD'}.zip"
     try:
-        with httpx.Client(follow_redirects=True, timeout=httpx.Timeout(120, connect=15)) as client:
-            with client.stream("GET", archive) as r:
-                if r.status_code == 404:
-                    raise RepoError(f"{owner}/{repo} not found. Is the repository public?")
-                r.raise_for_status()
-                # github.com redirects HEAD to codeload.github.com/.../zip/<sha>
-                resolved = str(r.url).rstrip("/").rsplit("/", 1)[-1]
-                buf = io.BytesIO()
-                for chunk in r.iter_bytes():
-                    buf.write(chunk)
-                    if buf.tell() > MAX_DOWNLOAD_BYTES:
-                        raise RepoError("Repository archive is larger than 150 MB; upload a trimmed .zip instead.")
+        with (httpx.Client(follow_redirects=True, timeout=httpx.Timeout(120, connect=15)) as client,
+              client.stream("GET", archive) as r):
+            if r.status_code == 404:
+                raise RepoError(f"{owner}/{repo} not found. Is the repository public?")
+            r.raise_for_status()
+            # github.com redirects HEAD to codeload.github.com/.../zip/<sha>
+            resolved = str(r.url).rstrip("/").rsplit("/", 1)[-1]
+            buf = io.BytesIO()
+            for chunk in r.iter_bytes():
+                buf.write(chunk)
+                if buf.tell() > MAX_DOWNLOAD_BYTES:
+                    raise RepoError("Repository archive is larger than 150 MB; upload a trimmed .zip instead.")
     except httpx.HTTPError as e:
         raise RepoError(f"Could not download {owner}/{repo}: {e}") from e
     return buf.getvalue(), f"{owner}/{repo}", resolved
@@ -344,6 +344,19 @@ def render_pack(pack: RepoPack) -> str:
 def load_github(url: str) -> RepoPack:
     data, name, ref = download_github_zip(url)
     return pack_zip(data, name=name, ref=ref, source_url=url.strip())
+
+
+def load_dir(path: str, name: str | None = None) -> RepoPack:
+    """Pack a local folder (e.g. a submission received by email, or an eval fixture)."""
+    from pathlib import Path
+
+    root = Path(path).resolve()
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for p in sorted(root.rglob("*")):
+            if p.is_file() and not any(part in SKIP_DIRS for part in p.relative_to(root).parts):
+                zf.write(p, f"{root.name}/{p.relative_to(root).as_posix()}")
+    return pack_zip(buf.getvalue(), name=name or root.name, ref="", source_url=f"dir:{root.name}")
 
 
 def load_zip_upload(data: bytes, filename: str) -> RepoPack:

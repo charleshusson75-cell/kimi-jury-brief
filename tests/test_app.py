@@ -55,3 +55,16 @@ def test_app_renders_canned_brief():
     labels = [m.label for m in at.metric]
     assert "Citations found in repo" in labels
     assert "Committed credentials" in "\n".join(m.value for m in at.markdown)
+
+
+def test_sample_brief_replays_without_api_key(monkeypatch):
+    monkeypatch.delenv("KIMI_API_KEY", raising=False)
+    monkeypatch.delenv("MOONSHOT_API_KEY", raising=False)
+    at = AppTest.from_file(APP, default_timeout=30)
+    at.run()
+    sample = [b for b in at.button if b.label.startswith("…or see a sample brief")]
+    assert sample, "sample button missing"
+    sample[0].click().run()
+    assert not at.exception
+    labels = [m.label for m in at.metric]
+    assert "Citations found in repo" in labels

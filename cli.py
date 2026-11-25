@@ -1,7 +1,7 @@
 """Brief one or more repos from the terminal.
 
     python cli.py https://github.com/owner/repo --challenge haks-2026 --lang fr
-    python cli.py team1.zip team2.zip --challenge kimi-paris-challenge
+    python cli.py team1.zip ./team2-folder --challenge kimi-paris-challenge
     python cli.py https://github.com/owner/repo --dry-run   # pack + count tokens, no model call
 """
 
@@ -19,12 +19,14 @@ from jury import brief_to_json, save  # noqa: E402
 from jury import kimi as K  # noqa: E402
 from jury.brief import load_challenges, weighted_score  # noqa: E402
 from jury.citations import verify_brief  # noqa: E402
-from jury.repo import RepoError, load_github, load_zip_upload  # noqa: E402
+from jury.repo import RepoError, load_dir, load_github, load_zip_upload  # noqa: E402
 from jury.report import to_markdown  # noqa: E402
 
 
 def load(src: str):
     p = Path(src)
+    if p.is_dir():
+        return load_dir(str(p))
     if p.suffix == ".zip" and p.exists():
         return load_zip_upload(p.read_bytes(), p.name)
     return load_github(src)
@@ -33,7 +35,7 @@ def load(src: str):
 def main() -> int:
     challenges = load_challenges()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("repos", nargs="+", help="GitHub URLs or .zip files")
+    ap.add_argument("repos", nargs="+", help="GitHub URLs, .zip files or local folders")
     ap.add_argument("--challenge", default="generic", choices=sorted(challenges))
     ap.add_argument("--lang", default="en", choices=["en", "fr"])
     ap.add_argument("--model", default="kimi-k3.1-pro", choices=sorted(K.PRICES))
@@ -57,8 +59,9 @@ def main() -> int:
         messages = K.brief_messages(pack, ch, args.lang)
         try:
             tokens = K.count_tokens(messages, args.model)
+            est = K.estimate_cost(tokens, args.model)
             print(f"  exact prompt size: {tokens:,} tokens "
-                  f"({tokens / K.CONTEXT_WINDOW:.0%} of the 1M window), est. cost ${K.estimate_cost(tokens, args.model):.2f}")
+                  f"({tokens / K.CONTEXT_WINDOW:.0%} of the 1M window), est. cost ${est:.2f}")
         except K.KimiError as e:
             tokens = pack.approx_tokens
             print(f"  (token count unavailable: {e})")
@@ -69,9 +72,7 @@ def main() -> int:
             print(f"  ! {problem}")
             continue
 
-        n = {"r": 0}
-
-        def on_reasoning(t: str) -> None:
+        def on_reasoning(t: str, n: dict = {"r": 0}) -> None:  # noqa: B006 - fresh dict per repo (defined in loop)
             n["r"] += len(t)
             if n["r"] % 2000 < len(t):
                 print(f"\r  thinking… {n['r']:,} chars", end="", flush=True)
@@ -89,10 +90,11 @@ def main() -> int:
                  "cost": f"${cost:.3f}", "time": f"{res.seconds:.0f}s",
                  "citations": f"{totals['verified']}/{totals['total']} found in the repo"}
         md = to_markdown(res.brief, ch, args.lang, repo=pack.name, ref=pack.ref, stats=stats)
-        base = save(args.out, pack.name, pack.ref, md,
-                    brief_to_json(res.brief, repo=pack.name, ref=pack.ref, challenge=ch.id, lang=args.lang, **stats))
+        js = brief_to_json(res.brief, repo=pack.name, ref=pack.ref, challenge=ch.id, lang=args.lang, **stats)
+        base = save(args.out, pack.name, pack.ref, md, js)
         score = weighted_score(res.brief, ch)
-        print(f"  score {score}/10 · citations {totals['verified']}/{totals['total']} · ${cost:.3f} · {res.seconds:.0f}s")
+        cites = f"{totals['verified']}/{totals['total']}"
+        print(f"  score {score}/10 · citations {cites} · ${cost:.3f} · {res.seconds:.0f}s")
         print(f"  -> {base}.md")
         board.append((score or 0, pack.name, cost))
 

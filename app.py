@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 
@@ -18,7 +19,7 @@ from jury import brief_to_json, save  # noqa: E402
 from jury import kimi as K  # noqa: E402
 from jury.brief import load_challenges, weighted_score  # noqa: E402
 from jury.citations import Citation, verify_brief  # noqa: E402
-from jury.repo import RepoError, RepoPack, load_github, load_zip_upload  # noqa: E402
+from jury.repo import RepoError, RepoPack, load_dir, load_github, load_zip_upload  # noqa: E402
 from jury.report import LABELS, STATUS_ICON, to_markdown  # noqa: E402
 
 st.set_page_config(page_title="Kimi Jury Brief", page_icon="⚖️", layout="wide")
@@ -26,6 +27,7 @@ st.set_page_config(page_title="Kimi Jury Brief", page_icon="⚖️", layout="wid
 CHALLENGES = load_challenges()
 SMALL_CONTEXT = 128_000
 OUT_DIR = Path(__file__).parent / "briefs"
+SAMPLE_DIR = Path(__file__).parent / "evals" / "planted_flaws"
 
 ss = st.session_state
 ss.setdefault("pack", None)
@@ -44,6 +46,10 @@ with st.sidebar:
     model = st.selectbox("Model", list(K.PRICES), index=0)
     effort = st.select_slider("Reasoning effort", ["low", "high", "max"], value="high",
                               help="K3.1 Pro always thinks. 'max' is the API default; 'high' is faster and cheaper.")
+    keep_cached = st.toggle("Keep the repo cached for 1 hour", value=True,
+                            help="A brief takes several minutes, longer than Kimi's default 5-minute cache. A 1-hour "
+                                 "cache write costs 2x input once, then every follow-up question reads the repo at "
+                                 "a tenth of the input price.")
     tier = st.selectbox("Your account tier", list(K.TIERS), index=1,
                         help="Tiers depend on cumulative recharge. The gateway counts prompt + output budget "
                              "against your tokens-per-minute limit.")
@@ -179,6 +185,26 @@ with tab_brief:
         except RepoError as e:
             st.error(str(e))
 
+    sample_runs = sorted(SAMPLE_DIR.glob("results/raw-*.json"))
+    if sample_runs and st.button("…or see a sample brief (replayed, no API key or cost)", type="tertiary"):
+        # Replays a saved Kimi answer on the synthetic planted-flaw submission in evals/.
+        raw = json.loads(sample_runs[-1].read_text(encoding="utf-8"))
+        run = raw["run"]
+        sch = CHALLENGES["haks-2026"]
+        spack = load_dir(str(SAMPLE_DIR / "submission"), name="planted-flaws-submission (synthetic)")
+        sbrief = raw["brief"]
+        stotals = verify_brief(spack, sbrief)
+        susage = K.Usage(prompt=run["prompt"], cached=run["cached"], completion=run["completion"],
+                         reasoning=run.get("reasoning"))
+        smd = to_markdown(sbrief, sch, "en", repo=spack.name, ref="")
+        ss.pack, ss.qa, ss.result = spack, [], {
+            "brief": sbrief, "pack": spack, "challenge": sch, "lang": "en", "model": run["model"],
+            "effort": run["effort"], "usage": susage, "seconds": run["seconds"], "totals": stotals,
+            "mode": run.get("structured_output", "json_schema"), "markdown": smd,
+            "json": brief_to_json(sbrief, replay_of=sample_runs[-1].name), "replay": True}
+        st.caption("Sample: a synthetic HAKS 2026 submission with 7 planted flaws (see evals/planted_flaws). "
+                   "This is Kimi's saved answer, re-checked against the repo now.")
+
     pack: RepoPack | None = ss.pack
     if pack:
         tokens = ss.get("exact_tokens") or pack.approx_tokens
@@ -238,6 +264,7 @@ with tab_brief:
 
                 try:
                     res = K.run_brief(pack, ch, lang, model=model, effort=effort,
+                                      cache_ttl="1h" if keep_cached else "5m",
                                       on_reasoning=on_reasoning, on_content=on_content)
                     status.update(label=f"Done in {res.seconds:.0f}s", state="complete", expanded=False)
                     totals = verify_brief(pack, res.brief)
@@ -274,9 +301,10 @@ with tab_brief:
 
         st.divider()
         st.markdown("#### Ask Kimi about this repo")
+        ttl_text = "1 hour" if ss.result["usage"].cache_ttl == "1h" else "5 minutes"
         st.caption("Follow-ups reuse the same repository prefix, so Kimi serves it from its context cache "
                    f"at ${K.PRICES[model]['cached']:.2f} instead of ${K.PRICES[model]['input']:.2f} per million "
-                   "input tokens (cache lives 5 minutes after the last call).")
+                   f"input tokens (cache kept for {ttl_text} after the last call).")
         for q, a, u, secs in ss.qa:
             st.markdown(f"**Q: {q}**")
             st.markdown(a)

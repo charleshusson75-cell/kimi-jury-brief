@@ -12,7 +12,7 @@ import os
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Callable
+from collections.abc import Callable
 
 import httpx
 from openai import (
@@ -119,11 +119,13 @@ class Usage:
     cached: int = 0
     completion: int = 0
     reasoning: int | None = None
+    cache_write: int = 0
+    cache_ttl: str = "5m"
 
     @classmethod
-    def from_api(cls, u) -> "Usage":
+    def from_api(cls, u, cache_ttl: str = "5m") -> Usage:
         if u is None:
-            return cls()
+            return cls(cache_ttl=cache_ttl)
         d = u.model_dump() if hasattr(u, "model_dump") else dict(u)
         details = d.get("prompt_tokens_details") or {}
         cached = details.get("cached_tokens") or d.get("cached_tokens") or 0
@@ -133,12 +135,17 @@ class Usage:
             cached=int(cached),
             completion=int(d.get("completion_tokens") or 0),
             reasoning=cdetails.get("reasoning_tokens"),
+            cache_write=int(details.get("cache_write_tokens") or 0),
+            cache_ttl=cache_ttl,
         )
 
     def cost(self, model: str) -> float:
+        """Estimate at list price. 5-minute cache writes cost the same as input; 1-hour writes cost double."""
         p = PRICES.get(model, PRICES["kimi-k3.1-pro"])
         fresh = max(self.prompt - self.cached, 0)
-        return (fresh * p["input"] + self.cached * p["cached"] + self.completion * p["output"]) / 1_000_000
+        write_premium = self.cache_write * p["input"] if self.cache_ttl == "1h" else 0
+        return (fresh * p["input"] + write_premium + self.cached * p["cached"]
+                + self.completion * p["output"]) / 1_000_000
 
 
 def estimate_cost(prompt_tokens: int, model: str, expected_output: int = 12_000) -> float:
@@ -163,7 +170,11 @@ class BriefResult:
 
 def _stream(cl: OpenAI, *, model: str, messages: list[dict], effort: str, max_output: int,
             response_format: dict | None, cache_key: str,
-            on_reasoning: Callable[[str], None] | None, on_content: Callable[[str], None] | None):
+            on_reasoning: Callable[[str], None] | None, on_content: Callable[[str], None] | None,
+            cache_ttl: str = "5m"):
+    extra_body: dict = {"reasoning_effort": effort}
+    if cache_ttl != "5m":
+        extra_body["prompt_cache_options"] = {"ttl": cache_ttl}
     kwargs = dict(
         model=model,
         messages=messages,
@@ -173,7 +184,7 @@ def _stream(cl: OpenAI, *, model: str, messages: list[dict], effort: str, max_ou
         prompt_cache_key=cache_key,
         # K3-series always thinks; effort is low | high | max. temperature/top_p are fixed
         # server-side and must not be sent.
-        extra_body={"reasoning_effort": effort},
+        extra_body=extra_body,
     )
     if response_format:
         kwargs["response_format"] = response_format
@@ -216,9 +227,11 @@ def _parse_json(text: str) -> dict:
 
 
 def run_brief(pack: RepoPack, ch: Challenge, lang: str, *, model: str = "kimi-k3.1-pro",
-              effort: str = "high", max_output: int = DEFAULT_MAX_OUTPUT,
+              effort: str = "high", max_output: int = DEFAULT_MAX_OUTPUT, cache_ttl: str = "5m",
               on_reasoning: Callable[[str], None] | None = None,
               on_content: Callable[[str], None] | None = None) -> BriefResult:
+    """cache_ttl="1h" keeps the repository cached for an hour of follow-up questions.
+    A brief takes several minutes, which can outlast the default 5-minute cache."""
     cl = client()
     messages = brief_messages(pack, ch, lang)
     cache_key = f"jury-brief:{pack.name}:{pack.ref or 'upload'}"
@@ -230,17 +243,19 @@ def run_brief(pack: RepoPack, ch: Challenge, lang: str, *, model: str = "kimi-k3
         try:
             raw, reasoning, usage, finish = _stream(
                 cl, model=model, messages=messages, effort=effort, max_output=max_output,
-                response_format=fmt, cache_key=cache_key, on_reasoning=on_reasoning, on_content=on_content)
+                response_format=fmt, cache_key=cache_key, on_reasoning=on_reasoning, on_content=on_content,
+                cache_ttl=cache_ttl)
         except BadRequestError as e:
             if "schema" not in str(e).lower() and "response_format" not in str(e).lower():
                 raise
             # Fall back to plain JSON mode with the schema in the prompt.
             mode = "json_object"
-            messages = messages[:-1] + [{"role": "user", "content": messages[-1]["content"] + json_object_fallback_prompt()}]
+            last = {"role": "user", "content": messages[-1]["content"] + json_object_fallback_prompt()}
+            messages = messages[:-1] + [last]
             raw, reasoning, usage, finish = _stream(
                 cl, model=model, messages=messages, effort=effort, max_output=max_output,
                 response_format={"type": "json_object"}, cache_key=cache_key,
-                on_reasoning=on_reasoning, on_content=on_content)
+                on_reasoning=on_reasoning, on_content=on_content, cache_ttl=cache_ttl)
     except Exception as e:  # noqa: BLE001 - turn SDK errors into something a juror can act on
         raise KimiError(describe_error(e)) from e
 
@@ -251,7 +266,7 @@ def run_brief(pack: RepoPack, ch: Challenge, lang: str, *, model: str = "kimi-k3
         brief = _parse_json(raw)
     except (json.JSONDecodeError, ValueError) as e:
         raise KimiError(f"Kimi's answer was not valid JSON ({e}). First 300 chars: {raw[:300]!r}") from e
-    return BriefResult(brief=brief, raw=raw, reasoning=reasoning, usage=Usage.from_api(usage), model=model,
+    return BriefResult(brief=brief, raw=raw, reasoning=reasoning, usage=Usage.from_api(usage, cache_ttl), model=model,
                        seconds=time.time() - t0, structured_output=mode, finish_reason=finish)
 
 

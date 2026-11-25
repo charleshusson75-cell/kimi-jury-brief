@@ -80,10 +80,12 @@ BRIEF_SCHEMA: dict = {
     "properties": {
         "project_name": {"type": "string"},
         "what_it_does": {"type": "string", "description": "One sentence, plain words."},
-        "verdict": {"type": "string", "description": "3-4 sentences for the jury: what is real, what is not, what stands out."},
+        "verdict": {"type": "string",
+                    "description": "3-4 sentences for the jury: what is real, what is not, what stands out."},
         "claims": {
             "type": "array",
-            "description": "The 4-8 most important claims the team makes (README, docs, slides, UI text), checked against the code.",
+            "description": ("The 4-8 most important claims the team makes (README, docs, slides, UI text), "
+                            "checked against the code."),
             "items": {
                 "type": "object",
                 "properties": {
