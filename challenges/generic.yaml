@@ -1,0 +1,19 @@
+id: generic
+name: "Generic hackathon"
+event: "Any hackathon"
+brief: |
+  No specific brief. Judge the project on its own stated goal.
+required_stack: []
+criteria:
+  - name: "Innovation"
+    weight: 25
+    rubric: "Is the idea or the approach new or surprising for this audience?"
+  - name: "Technical depth"
+    weight: 25
+    rubric: "Real implementation of non-trivial logic, rather than glue around one API call or mocked output."
+  - name: "Completeness"
+    weight: 25
+    rubric: "Does it work end to end as described in the README?"
+  - name: "Presentation"
+    weight: 25
+    rubric: "README, demo instructions and clarity of the pitch."

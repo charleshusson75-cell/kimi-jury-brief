@@ -1,0 +1,32 @@
+# HAKS 2026: the hackathon this tool was born from.
+# Public facts only (event listing on somo.social). The brief below is a summary of
+# the Airbus use case. Never paste anything Airbus shared under NDA into this file:
+# it is sent to the Kimi API with every run.
+id: haks-2026
+name: "HAKS 2026: Airbus × IBM × AWS"
+event: "HAKS 2026, Télécom Paris (Palaiseau), 11 June 2026. 150 students in teams of 5, use case provided by Airbus."
+brief: |
+  Airbus use case: aircraft corrosion. Build a working prototype that helps maintenance
+  teams find, assess and prioritise corrosion on aircraft structures, from inspection
+  data such as images, reports or maintenance records. The prototype should go beyond a
+  slide: show the data flow, the model or rules used, and how a maintenance engineer
+  would use the output.
+required_stack:
+  - "IBM Bob (IBM's AI development tool) or another IBM AI service, used in the build"
+  - "AWS cloud infrastructure (hosting, storage, compute or AI services)"
+criteria:
+  - name: "Relevance to the Airbus problem"
+    weight: 30
+    rubric: "Does the prototype address corrosion on aircraft for a maintenance user, with a realistic input and an output an engineer could act on?"
+  - name: "Technical depth"
+    weight: 30
+    rubric: "Is there a real model, pipeline or algorithm, and is it implemented rather than mocked? Credit sound data handling and honest evaluation."
+  - name: "Use of the sponsor stack"
+    weight: 20
+    rubric: "Are IBM and AWS services genuinely part of the working solution, not just listed?"
+  - name: "Completeness and demo readiness"
+    weight: 20
+    rubric: "Can the jury run or see it end to end? README, setup steps, a working path from input to result."
+notes: "Sponsors want to know whether their stack was really used. Be precise about it."
+sources:
+  - "https://somo.social/e/haks-2026-hackathon-airbus-x-611"

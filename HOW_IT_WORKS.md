@@ -1,0 +1,9 @@
+**1. The whole repo in one request.** The repository is downloaded, filtered (no `node_modules`, lock files, binaries, notebook outputs or `.env` files), and packed into a single prompt, README first. Kimi K3.1 Pro's 1,048,576-token window holds a typical hackathon repo several times over, so the model sees the README's promises, the UI, the API and the model code at once. That's how it can say "the README claims real-time detection with watsonx, but `api/app.py` returns a hard-coded result". A retrieval pipeline that searches for "watsonx" finds the import and concludes it is used.
+
+**2. Evidence you can check.** Every point in the brief cites a file and a verbatim quote. The app looks each quote up in the repository and marks it ✓ found, ≈ close match or ✗ not found, with line numbers. The jury sees which evidence to trust, and a made-up citation can't pass as a real one.
+
+**3. Built for a human jury.** Kimi does not pick the winner. It surfaces claims vs. code, checks the sponsor stack, scores each criterion with evidence, and writes three questions that tell the jury in one answer whether the team built and understands its project. Briefs come out in English or French.
+
+**4. Cheap follow-ups.** Questions about the same repo reuse the identical prefix (system prompt + repository), which Kimi serves from its context cache at $0.20 instead of $2.00 per million input tokens.
+
+**5. Safe by default.** `.env` and key files are never read. Committed API keys and passwords are replaced with `[REDACTED_SECRET]` before sending, and reported to the jury as a red flag. Text in the repository that tries to instruct an AI reviewer is treated as data and flagged. Use it on public repositories, or with the teams' consent: Kimi's privacy policy allows inputs to be used to improve its models.

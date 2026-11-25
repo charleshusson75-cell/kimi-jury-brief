@@ -1,0 +1,24 @@
+# Template for the Kimi track at a Paris student hackathon (90-day launch plan, days 31-60).
+id: kimi-paris-challenge
+name: "Kimi Paris Challenge (template)"
+event: "Kimi track at a Paris student hackathon. Prize: API credits and a cash award."
+brief: |
+  Build something useful for French users or French companies with the Kimi API.
+  Bonus points for products that need what Kimi K3.1 Pro is good at: very long
+  context (up to 1M tokens), agentic coding, and tool use.
+required_stack:
+  - "Kimi API (kimi-k3.1-pro, kimi-k3.1-pro-highspeed or kimi-k3), called from the application code at https://api.moonshot.ai/v1"
+criteria:
+  - name: "Uses what makes Kimi different"
+    weight: 30
+    rubric: "Would the product work just as well on any small-context model? Credit real use of long context, context caching, tool calls or agentic loops."
+  - name: "Value for French users or companies"
+    weight: 25
+    rubric: "A real French user or buyer, a real problem, French-language quality where it matters."
+  - name: "Technical execution"
+    weight: 25
+    rubric: "Working code path from input to Kimi call to result; error handling; no mocked model output."
+  - name: "Demo and documentation"
+    weight: 20
+    rubric: "Clear README, setup in minutes, honest about limits and cost."
+notes: "Check that the Kimi API is really called on the main code path, not only listed in requirements."
