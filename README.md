@@ -93,9 +93,9 @@ Costs at list price ($2 / $10 per M input / output tokens): a 200k-token repo co
 
 ## Next
 
-- **Batch mode** for a whole hackathon overnight: Kimi's Batch API runs `kimi-k3.1-pro` at 60% of the standard price.
+- **Batch mode** for a whole hackathon overnight: Kimi's Batch API runs `kimi-k3.1-pro` at 60% of the standard price ($1.20 / $6.00 per M input / output tokens, [batch pricing](https://platform.kimi.ai/docs/pricing/batch), checked 25 Nov 2026).
 - **GitHub Action** for organisers: brief every submission when the deadline closes.
 - **Friction log**: what a developer in France runs into when getting started with the Kimi API, in [FRICTION_LOG.md](FRICTION_LOG.md).
 
 ---
-Built by Charles Husson with Kimi K3.1 Pro on platform.kimi.ai, November 2026.
+Built by Charles Husson on Kimi K3.1 Pro (platform.kimi.ai), November 2026.

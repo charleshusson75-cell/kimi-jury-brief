@@ -37,9 +37,9 @@ The [pricing page](https://platform.kimi.ai/docs/pricing/chat) text says cached 
 In my session the Create API Key dialog showed Expiration: *Never*, with only a warning that a never-expiring key makes a leak worse.
 *Suggestion:* default to 90 days, and make *Never* a deliberate choice.
 
-**8. Paying from France.**
-The [billing FAQ](https://platform.kimi.ai/docs/guide/account-and-payments) lists only WeChat Pay and Alipay QR codes for individual top-ups. If cards are accepted, the FAQ should say so up front. If they aren't, most French developers can't pay at all.
-*Launch suggestion:* card, Apple Pay and SEPA for EU accounts on day one. For the first wave, prepaid credit codes distributed at events.
+**8. Paying from France works, but the docs say otherwise.**
+I topped up with a French bank card, and it went through at once. But the [billing FAQ](https://platform.kimi.ai/docs/guide/account-and-payments) lists only WeChat Pay and Alipay QR codes for individual top-ups. That would stop many French developers before they even try.
+*Launch suggestion:* say "bank cards accepted" in the FAQ and on the Recharge page, and add SEPA and Apple Pay for EU accounts. For the first wave, hand out prepaid credit codes at events.
 
 **9. The first question a French company will ask.**
 The [platform privacy policy](https://platform.kimi.ai/docs/agreement/userprivacy) (Moonshot AI Pte. Ltd., Singapore; last updated 30 April 2025) says user content may be used for "training and refining our underlying technology". A zero-data-retention option exists for enterprise customers. A clear "API inputs are not used for training" default, or an EU-hosted endpoint, would remove the main objection before a sales call starts. It's the same objection the 90-day launch plan is built around.
